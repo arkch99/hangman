@@ -1,8 +1,11 @@
 require 'set'
+require 'yaml'
 require 'byebug'
 
 class Game
-	attr_reader :n_guesses, :guessed_chars
+	attr_reader :n_guesses, :guessed_chars, :revealed_word, :save_location
+	attr_accessor :resuming	
+
 	def initialize # 
 		File.open("data/dict.txt", "r") do |dict|
 			text = dict.read.split
@@ -14,17 +17,26 @@ class Game
 		@revealed_word = "_" * @word.length 
 		@won = false
 		@game_over = false
+		@resuming = false		
 	end
+
+	def cleanup_saves
+		File.delete("saves/savedata.yml") if File.exists?("saves/savedata.yml")
+	end			
 
 	def already_guessed?(ch) #is this necessary?
 		return @guessed_chars.include?(ch)
+	end
+
+	def show_progress
+		puts @revealed_word.chars.join(" ")
 	end
 
 	def reveal_char(index_list, ch) #take in character and indices where it occurs, then reveal those
 		index_list.each do |i|			
 			@revealed_word[i] = ch
 		end
-		puts @revealed_word.chars.join(" ")
+		show_progress
 	end
 
 	def eval_guess(ch)
@@ -47,6 +59,7 @@ class Game
 				@game_over = true
 			else
 				puts "\nYou have #{@n_guesses} guesses remaining!"
+				show_progress
 			end
 		end
 	end
@@ -59,7 +72,11 @@ class Game
 			exit
 		elsif str == "SAVE"
 			# save
-			puts "\nReceived save command"			
+			File.open("saves/savedata.yml", "w") do |file|
+				yml_content = YAML.dump(self)
+				file.puts(yml_content)
+			end
+			puts "\nProgress saved!"			
 		elsif str.length != 1
 			puts "\nGuess must be a single letter or a valid command!"			
 		else
@@ -72,7 +89,11 @@ class Game
 	end
 
 	def play
-		puts "You are now playing Hangman!\n"
+		puts "\nYou are now playing Hangman!"
+		if @resuming
+			puts "This was your progress:"
+			show_progress
+		end
 		puts "Enter a letter to guess, otherwise enter SAVE or QUIT."
 		until @game_over			
 			puts "\nEnter your guess or a command:"
@@ -83,11 +104,35 @@ class Game
 
 		if @won
 			puts "\nYou won!"
+			cleanup_saves
 		else
 			puts "\nYou lost! The word was #{@word}!"
+			cleanup_saves
 		end
 	end
 end
 
-game_obj = Game.new
+puts "Welcome to the ultimate Hangman!"
+save_location = "saves/savedata.yml"
+game_obj = nil
+if File.exists?(save_location)
+	loop do
+		puts "Load your last save(0) or start a new game(1)?"
+		choice = gets.chomp
+		if choice == "0"			
+			game_obj = YAML.parse_file(save_location).to_ruby
+			game_obj.resuming = true
+			break
+		elsif choice == "1"
+			game_obj = Game.new
+			break
+		else
+			puts "Please enter a valid choice!"
+		end
+	end
+else
+	puts "No save found, starting a new game..."	
+	game_obj = Game.new
+end
+
 game_obj.play
