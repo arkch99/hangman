@@ -9,7 +9,8 @@ class Game
 			text = dict.read.split
 			@word = text[Random.rand(text.size - 1)] # get a random word
 			@word.upcase!			
-		end				
+		end
+		Dir.mkdir("saves") unless Dir.exists?("saves")
 		@n_guesses = 6
 		@guessed_chars = Set.new
 		@revealed_word = "_" * @word.length 
